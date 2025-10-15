@@ -1,0 +1,15 @@
+{
+    "FETCH_MODE": "ACTIVE_ONLY",
+    "DATE": "03-10-2025",
+    "SHARE_WITH": [
+        "krunalramanuj@gmail.com",
+        "developer@vaama.co"
+    ],
+        "TARGET_RATIOS": {
+        "rings": 40,
+        "pendants": 25,
+        "earrings": 20,
+        "bracelets": 15
+    }
+
+}
