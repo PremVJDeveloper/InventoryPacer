@@ -2,12 +2,13 @@ name: Run main.py on schedule
 
 on:
   schedule:
-    - cron: '30 0 * * *'
-  workflow_dispatch:
+    - cron: '30 0 * * *'   # Runs every day at 00:30 UTC
+  workflow_dispatch:        # Allows manual trigger from the Actions tab
 
 jobs:
   run-main:
     runs-on: ubuntu-latest
+
     env:
       SHOPIFY_ACCESS_TOKEN: ${{ secrets.SHOPIFY_ACCESS_TOKEN }}
       SHOPIFY_STORE: ${{ secrets.SHOPIFY_STORE }}
@@ -15,7 +16,6 @@ jobs:
       MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
       SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-
 
     steps:
       - name: Checkout repo
@@ -32,5 +32,4 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run main.py
-        run: |
-          python main.py
+        run: python main.py
