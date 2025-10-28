@@ -38,11 +38,11 @@ class ShopifyProductTracker:
         # self.db_manager = DatabaseManager()
         self.ratio_calculator = RatioCalculator(self.target_ratios)
         credentials_path = os.path.join(os.getcwd(), "config", "google_service_account.json")
-        self.google_sheet_id = os.getenv("GOOGLE_SHEET_ID", "1iGiZ7PHUWUwnR8LJStyTQpoq1q6eQVd-cPiTlzKWfLg")
-        self.google_agent = GoogleSheetAgent(
-            credentials_path=credentials_path,
-            sheet_id=self.google_sheet_id
-        )
+        # self.google_sheet_id = os.getenv("GOOGLE_SHEET_ID", "1iGiZ7PHUWUwnR8LJStyTQpoq1q6eQVd-cPiTlzKWfLg")
+        # self.google_agent = GoogleSheetAgent(
+        #     credentials_path=credentials_path,
+        #     sheet_id=self.google_sheet_id
+        # )
         self.mailer = Mailer(
             sender=os.getenv("MAIL_SENDER", "developer@vaama.co"),
             password=os.getenv("MAIL_PASSWORD"),
