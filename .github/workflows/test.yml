@@ -1,6 +1,0 @@
-name: Run main.py on schedule
-
-on:
-  schedule:
-    - cron: '30 0 * * *'   # your cron
-  workflow_dispatch:       # allow manual trigger
