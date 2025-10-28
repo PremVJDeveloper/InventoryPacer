@@ -135,7 +135,6 @@ class ShopifyProductTracker:
                 counts[ptype] += 1
 
         # Update database
-        import pdb;pdb.set_trace()  
         db_manager = DatabaseManager()
         success = db_manager.upsert_product_counts(self.current_date, counts)
         if not success:

@@ -18,7 +18,6 @@ class DatabaseManager:
     def check_date_exists(self, date):
         """Check if a record with the given date already exists"""
         try:
-            import pdb; pdb.set_trace()
             response = self.supabase.table(self.table_name)\
                 .select("id, Date, rings, pendants, earrings, bracelets")\
                 .filter("Date", "eq", str(date))\
@@ -44,7 +43,6 @@ class DatabaseManager:
     def update_jewelry_data(self, record_id, counts):
         """Update existing jewelry data"""
         try:
-            import pdb; pdb.set_trace()
             response = self.supabase.table(self.table_name)\
                 .update(counts)\
                 .filter("id", "eq", record_id)\
@@ -68,7 +66,6 @@ class DatabaseManager:
             counts (dict): Dictionary with product counts like {'rings': 5, 'pendants': 3, ...}
         """
         try:
-            import pdb; pdb.set_trace()
             # Prepare the data for insertion/update
             jewelry_data = counts.copy()
             jewelry_data['Date'] = date
@@ -90,7 +87,6 @@ class DatabaseManager:
                         print(f"{key}: {existing_value} → {new_value}")
                 
                 if needs_update:
-                    import pdb; pdb.set_trace()
                     print(f"🔄 Updating existing record for date {date}")
                     success = self.update_jewelry_data(existing_record['id'], update_data)
                     return success
