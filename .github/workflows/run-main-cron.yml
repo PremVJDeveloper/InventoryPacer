@@ -10,12 +10,12 @@ jobs:
   run-main:
     runs-on: ubuntu-latest
     env:
-    SHOPIFY_ACCESS_TOKEN: ${{ secrets.SHOPIFY_ACCESS_TOKEN }}
-    SHOPIFY_STORE: ${{ secrets.SHOPIFY_STORE }}
-    MAIL_SENDER: ${{ secrets.MAIL_SENDER }}
-    MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
-    SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-    SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SHOPIFY_ACCESS_TOKEN: ${{ secrets.SHOPIFY_ACCESS_TOKEN }}
+      SHOPIFY_STORE: ${{ secrets.SHOPIFY_STORE }}
+      MAIL_SENDER: ${{ secrets.MAIL_SENDER }}
+      MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+      SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
 
 
     steps:
