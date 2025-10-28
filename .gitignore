@@ -3,3 +3,5 @@ logs
 env
 reports
 __pycache__
+secret.key
+encrypt.py

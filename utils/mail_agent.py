@@ -5,10 +5,11 @@ import pandas as pd
 import logging
 
 class Mailer:
-    def __init__(self, sender, password, receiver):
+    def __init__(self, sender, password, receiver, cc_ids):
         self.sender = sender
         self.password = password
         self.receiver = receiver
+        self.receiver_cc = cc_ids
         self.logger = logging.getLogger('shopify_tracker')
 
     def send_alert(self, subject, body, df):
@@ -19,6 +20,7 @@ class Mailer:
             msg = MIMEMultipart('alternative')
             msg['From'] = self.sender
             msg['To'] = self.receiver
+            msg['Cc'] = self.receiver_cc
             msg['Subject'] = subject
 
             html_table = df.to_html(index=False, border=1)

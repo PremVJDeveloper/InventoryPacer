@@ -1,115 +1,109 @@
-import sqlite3
-import logging
 import os
+from supabase import create_client, Client
 from datetime import datetime
+from dotenv import load_dotenv
+import requests
+from json.decoder import JSONDecodeError
+import json
+
+load_dotenv()
 
 class DatabaseManager:
-    def __init__(self, db_path="database/shopify_tracker.db"):
-        self.db_path = db_path
-        self.logger = logging.getLogger('shopify_tracker')
-        self._init_database()
+    def __init__(self):
+        self.SUPABASE_URL = os.getenv("SUPABASE_URL")
+        self.SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+        self.supabase = create_client(self.SUPABASE_URL, self.SUPABASE_KEY)
+        self.table_name = "inventorypacer"
 
-    def _init_database(self):
-        """Initialize database and create table if not exists"""
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
-        
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS product_counts (
-                date TEXT PRIMARY KEY,
-                rings INTEGER DEFAULT 0,
-                pendants INTEGER DEFAULT 0,
-                earrings INTEGER DEFAULT 0,
-                bracelets INTEGER DEFAULT 0,
-                necklaces INTEGER DEFAULT 0,
-                total_products INTEGER DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        
-        conn.commit()
-        conn.close()
-        self.logger.info("Database initialized successfully")
-
-    def upsert_product_counts(self, date_str, counts):
-        """Insert or update product counts for a specific date"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
+    def check_date_exists(self, date):
+        """Check if a record with the given date already exists"""
         try:
-            # Calculate total products
-            total_products = sum(counts.values())
+            import pdb; pdb.set_trace()
+            response = self.supabase.table(self.table_name)\
+                .select("id, Date, rings, pendants, earrings, bracelets")\
+                .filter("Date", "eq", str(date))\
+                .execute()
             
-            cursor.execute('''
-                INSERT INTO product_counts (date, rings, pendants, earrings, bracelets, necklaces, total_products, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(date) DO UPDATE SET
-                    rings = excluded.rings,
-                    pendants = excluded.pendants,
-                    earrings = excluded.earrings,
-                    bracelets = excluded.bracelets,
-                    necklaces = excluded.necklaces,
-                    total_products = excluded.total_products,
-                    updated_at = excluded.updated_at
-            ''', (
-                date_str,
-                counts.get('rings', 0),
-                counts.get('pendants', 0),
-                counts.get('earrings', 0),
-                counts.get('bracelets', 0),
-                counts.get('necklaces', 0),
-                total_products,
-                datetime.now().isoformat()
-            ))
-            
-            conn.commit()
-            self.logger.info(f"Updated product counts for date {date_str}: {counts}")
-            
+            if response.data and len(response.data) > 0:
+                return response.data[0]  # Return the existing record
+            return None
         except Exception as e:
-            self.logger.error(f"Error upserting product counts: {e}")
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
+            print(f"❌ Error checking date existence: {e}")
+            return None
 
-    def get_product_counts(self, date_str):
-        """Get product counts for a specific date"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            SELECT rings, pendants, earrings, bracelets, necklaces, total_products 
-            FROM product_counts WHERE date = ?
-        ''', (date_str,))
-        
-        result = cursor.fetchone()
-        conn.close()
-        
-        if result:
-            return {
-                'Rings': result[0],
-                'Pendant': result[1],
-                'Earrings': result[2],
-                'Bracelets': result[3],
-                'Necklaces': result[4],
-                'Total': result[5]
-            }
-        return None
+    def insert_jewelry_data(self, jewelry_data):
+        """Insert new jewelry data"""
+        try:
+            response = self.supabase.table(self.table_name).insert(jewelry_data).execute()
+            print("✅ Data inserted successfully!")
+            return True
+        except Exception as e:
+            print(f"❌ Error inserting data: {e}")
+            return False
 
-    def get_all_counts(self):
-        """Get all product counts for reporting"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
+    def update_jewelry_data(self, record_id, counts):
+        """Update existing jewelry data"""
+        try:
+            import pdb; pdb.set_trace()
+            response = self.supabase.table(self.table_name)\
+                .update(counts)\
+                .filter("id", "eq", record_id)\
+                .execute()
+            
+            print("✅ Data updated successfully!")
+            return True
+        except JSONDecodeError as e:
+            print(f"JSON decode error during update: {e}")
+            return True
+        except Exception as e:
+            print(f"❌ Error updating data: {e}")
+            return False
+
+    def upsert_product_counts(self, date, counts):
+        """
+        Upsert product counts - insert if date doesn't exist, update if counts are different
         
-        cursor.execute('''
-            SELECT date, rings, pendants, earrings, bracelets, necklaces, total_products
-            FROM product_counts ORDER BY date
-        ''')
-        
-        results = cursor.fetchall()
-        conn.close()
-        
-        return results
+        Args:
+            date (str): The date in format 'dd-mm-yyyy'
+            counts (dict): Dictionary with product counts like {'rings': 5, 'pendants': 3, ...}
+        """
+        try:
+            import pdb; pdb.set_trace()
+            # Prepare the data for insertion/update
+            jewelry_data = counts.copy()
+            jewelry_data['Date'] = date
+            
+            # Check if date already exists
+            existing_record = self.check_date_exists(date)
+            
+            if existing_record:
+                # Date exists, check if counts are different
+                needs_update = False
+                update_data = {}
+                
+                for key, new_value in counts.items():
+                    existing_value = existing_record.get(key.lower(), None)
+                    # Convert both to string for comparison to handle different data types
+                    if str(existing_value) != str(new_value):
+                        needs_update = True
+                        update_data[key] = new_value
+                        print(f"{key}: {existing_value} → {new_value}")
+                
+                if needs_update:
+                    import pdb; pdb.set_trace()
+                    print(f"🔄 Updating existing record for date {date}")
+                    success = self.update_jewelry_data(existing_record['id'], update_data)
+                    return success
+                else:
+                    print(f"✅ Data unchanged for date {date}, no update needed")
+                    return True
+                    
+            else:
+                # Date doesn't exist, insert new record
+                print(f"🆕 Inserting new record for date {date}")
+                success = self.insert_jewelry_data(jewelry_data)
+                return success
+                
+        except Exception as e:
+            print(f"❌ Error in upsert operation: {e}")
+            return False

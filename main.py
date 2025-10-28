@@ -21,6 +21,7 @@ class ShopifyProductTracker:
         self.shopify_store = os.getenv("SHOPIFY_STORE")
         self.access_token = os.getenv("SHOPIFY_ACCESS_TOKEN")
         self.date_str = self.config.get("DATE")
+        self.current_date = datetime.now().date().strftime("%d-%m-%Y")
         self.share_with = self.config.get("SHARE_WITH", [])
         self.target_ratios = self.config.get("TARGET_RATIOS", {
             "rings": 40, "pendants": 25, "earrings": 20, "bracelets": 15
@@ -34,17 +35,19 @@ class ShopifyProductTracker:
         ).logger
         
         # Initialize components
-        self.db_manager = DatabaseManager()
+        # self.db_manager = DatabaseManager()
         self.ratio_calculator = RatioCalculator(self.target_ratios)
-        self.google_sheet_id = os.getenv("GOOGLE_SHEET_ID")
+        credentials_path = os.path.join(os.getcwd(), "config", "google_service_account.json")
+        self.google_sheet_id = os.getenv("GOOGLE_SHEET_ID", "1iGiZ7PHUWUwnR8LJStyTQpoq1q6eQVd-cPiTlzKWfLg")
         self.google_agent = GoogleSheetAgent(
-            credentials_path=r"D:\Prem New\Vaama LifeStyle\InventoryPacer-V2\InventoryPacer\config\google_service_account.json",
+            credentials_path=credentials_path,
             sheet_id=self.google_sheet_id
         )
         self.mailer = Mailer(
-            sender=os.getenv("MAIL_SENDER"),
+            sender=os.getenv("MAIL_SENDER", "developer@vaama.co"),
             password=os.getenv("MAIL_PASSWORD"),
-            receiver=os.getenv("MAIL_RECEIVER")
+            receiver=os.getenv("MAIL_RECEIVER", "developer@vaama.co"),
+            cc_ids=os.getenv("MAIL_CC", "developer@vaama.co")
         )
 
         if not all([self.shopify_store, self.access_token, self.date_str]):
@@ -123,7 +126,7 @@ class ShopifyProductTracker:
         return all_products
 
     def summarize_and_export(self, products):
-        product_types = ["Pendants", "Rings", "Earrings", "Bracelets", "Necklaces"]
+        product_types = ["Pendants", "Rings", "Earrings", "Bracelets"]
         counts = {ptype.lower(): 0 for ptype in product_types}
         
         for p in products:
@@ -132,10 +135,13 @@ class ShopifyProductTracker:
                 counts[ptype] += 1
 
         # Update database
-        self.db_manager.upsert_product_counts(self.date_str, counts)
-
-        # Prepare data for Excel and Google Sheets
-        data = {"Date": self.date_str, **counts}
+        import pdb;pdb.set_trace()  
+        db_manager = DatabaseManager()
+        success = db_manager.upsert_product_counts(self.current_date, counts)
+        if not success:
+            self.logger.error("Failed to upsert product counts to database.")
+            return None
+        data = {"Date": self.current_date, **counts}
         df_row = pd.DataFrame([data])
 
         # Save to Excel
@@ -145,14 +151,11 @@ class ShopifyProductTracker:
         excel_path = os.path.join(folder_path, f"shopify_products_{self.date_str}_{timestamp}.xlsx")
         df_row.to_excel(excel_path, index=False)
         self.logger.info(f"Excel file saved: {excel_path}")
+        # self.google_agent.append_data(df_row)
+        # if self.share_with:
+        #     self.google_agent.share_with_users(self.share_with, role="reader")
+        #     self.logger.info(f"Shared sheet with configured users: {self.share_with}")
 
-        # Update Google Sheets
-        self.google_agent.append_data(df_row)
-        if self.share_with:
-            self.google_agent.share_with_users(self.share_with, role="reader")
-            self.logger.info(f"Shared sheet with configured users: {self.share_with}")
-
-        # Check ratio and send alerts
         self._check_ratio_and_alert(counts)
 
         return excel_path
@@ -160,10 +163,10 @@ class ShopifyProductTracker:
     def _check_ratio_and_alert(self, counts):
         """
         Enhanced ratio checking with recommendations
+        Filters out overrepresented (negative difference) product types.
         """
         self.logger.info(f"Checking product ratio for: {counts}")
         
-        # Calculate total
         total_products = sum(counts.values())
         if total_products == 0:
             self.logger.error("No products uploaded, skipping ratio check.")
@@ -176,27 +179,34 @@ class ShopifyProductTracker:
             self.logger.error(analysis['error'])
             return
         
-        # Check if ratio is balanced
+        # Check ratio balance
         is_balanced = self.ratio_calculator.is_ratio_balanced(analysis)
         
         if not is_balanced:
             recommendations = self.ratio_calculator.get_recommendations(analysis)
             
-            # Prepare data for email
+            # Prepare summary data — only include rows where Difference > 0
             summary_data = []
             for product_type, data in analysis.items():
-                summary_data.append({
-                    'Product Type': product_type,
-                    'Current Count': data['current'],
-                    'Current %': f"{data['current_percent']:.1f}%",
-                    'Target %': f"{data['target_percent']:.1f}%",
-                    'Required Count': f"{data['required']:.1f}",
-                    'Difference': f"{data['difference']:+.1f}"
-                })
+                diff_value = data.get('adjusted_difference', data['next_upload_count'])
+                if diff_value > 0:  # ✅ include only underrepresented categories
+                    summary_data.append({
+                        'Product Type': product_type,
+                        'Current Count': data['current'],
+                        'Current %': f"{data['current_percent']:.1f}%",
+                        'Target %': f"{data['target_percent']:.1f}%",
+                        'Required Count': f"{data['required']:.1f}",
+                        'Next Upload Count': f"{diff_value:+.1f}"
+                    })
             
+            if not summary_data:
+                self.logger.info("All product ratios are balanced or above target — no alert needed.")
+                return
+            
+            import pandas as pd
             df_summary = pd.DataFrame(summary_data)
             
-            # Send alert email
+            # Build email content
             subject = f"Shopify Ratio Alert for {self.date_str}"
             body = (
                 f"The uploaded product ratios deviate from the target ratios.\n\n"
@@ -205,10 +215,11 @@ class ShopifyProductTracker:
                 f"\n\nPlease review the detailed summary below:"
             )
             
+            # Send alert email
             self.mailer.send_alert(subject, body, df_summary)
-            self.logger.info("Alert email triggered due to ratio deviation.")
+            self.logger.info(" Alert email triggered due to ratio deviation.")
         else:
-            self.logger.info("Product ratio within expected range.")
+            self.logger.info(" Product ratio within expected range.")
 
 
 if __name__ == "__main__":

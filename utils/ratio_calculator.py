@@ -13,12 +13,10 @@ class RatioCalculator:
 
     def calculate_required_uploads(self, current_counts: Dict[str, int]) -> Dict[str, Dict]:
         """
-        Calculate how many products of each type need to be uploaded to maintain target ratios
-        Returns dict with analysis and recommendations
+        Calculate how many products of each type need to be uploaded to maintain target ratios.
+        Returns dict containing only product types where more uploads are needed (positive difference).
         """
-        
         total_current = sum(current_counts.values())
-        
         if total_current == 0:
             return {"error": "No products available for analysis"}
         
@@ -28,43 +26,41 @@ class RatioCalculator:
             if product_type in self.target_ratios:
                 current_percentages[product_type] = (count / total_current) * 100
         
-        # Calculate required counts for each type to maintain ratio
+        # Calculate required counts
         required_counts = {}
         for product_type, target_percent in self.target_ratios.items():
             required_count = (target_percent / 100) * total_current
-            required_counts[product_type] = {
-                'current': current_counts.get(product_type, 0),
-                'required': round(required_count, 2),
-                'difference': round(required_count - current_counts.get(product_type, 0), 2),
-                'current_percent': current_percentages.get(product_type, 0),
-                'target_percent': target_percent
-            }
+            diff = required_count - current_counts.get(product_type, 0)
+            
+            # ✅ Keep only positive differences (need to upload more)
+            if diff > 0:
+                required_counts[product_type] = {
+                    'current': current_counts.get(product_type, 0),
+                    'required': round(required_count, 2),
+                    'next_upload_count': round(diff),  # ← renamed and rounded
+                    'current_percent': round(current_percentages.get(product_type, 0), 1),
+                    'target_percent': target_percent
+                }
         
+        if not required_counts:
+            self.logger.info("All product categories meet or exceed target ratios.")
         
         return required_counts
 
     def get_recommendations(self, analysis: Dict[str, Dict]) -> List[str]:
-        """Generate human-readable recommendations"""
+        """Generate upload recommendations for underrepresented types only."""
         recommendations = []
-        
         for product_type, data in analysis.items():
-            diff = data['difference']
-            if diff > 0:
+            upload_count = data.get('next_upload_count', 0)
+            if upload_count > 0:
                 recommendations.append(
-                    f"Upload {abs(diff):.0f} more {product_type} "
-                    f"(currently {data['current']}, need {data['required']:.0f})"
+                    f"Upload {upload_count} more {product_type} "
+                    f"(currently {data['current']}, need total {data['required']:.0f})"
                 )
-            elif diff < 0:
-                recommendations.append(
-                    f"Reduce {abs(diff):.0f} {product_type} uploads "
-                    f"(currently {data['current']}, should be {data['required']:.0f})"
-                )
-        
-        
         return recommendations
 
     def is_ratio_balanced(self, analysis: Dict[str, Dict], tolerance: float = 5.0) -> bool:
-        """Check if current ratios are within tolerance of target"""
+        """Check if current ratios are within tolerance of target."""
         for product_type, data in analysis.items():
             if abs(data['current_percent'] - data['target_percent']) > tolerance:
                 return False
