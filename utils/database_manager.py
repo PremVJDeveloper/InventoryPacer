@@ -66,7 +66,6 @@ class DatabaseManager:
             counts (dict): Dictionary with product counts like {'rings': 5, 'pendants': 3, ...}
         """
         try:
-            import pdb; pdb.set_trace()
             # Prepare the data for insertion/update
             jewelry_data = counts.copy()
             jewelry_data['Date'] = date
