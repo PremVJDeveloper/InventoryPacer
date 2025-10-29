@@ -121,21 +121,42 @@ def main():
     
     st.markdown('<h1 class="main-header">🏪 Shopify Product Dashboard</h1>', unsafe_allow_html=True)
 
-    # Fetch the latest date data
-    latest_df = dashboard.get_latest_data()
-    if latest_df.empty:
-        st.warning("No data available in Supabase.")
+        # Fetch the latest date data
+    all_data = dashboard.get_table_data()
+    if all_data.empty:
+        st.warning("⚠️ No data available in Supabase database.")
         return
-    
-    latest_date_str = latest_df['date'].iloc[0]
-    st.info(f"Showing latest available data for **{latest_date_str}**")
 
-    # Fetch complete data for that latest date
-    data_df = dashboard.get_table_data(date=latest_date_str)
+    # Get all available dates sorted (latest first)
+    available_dates = sorted(all_data['date'].unique(), reverse=True)
+    latest_date_str = available_dates[0]
+
+    # --- Add date selector ---
+    selected_date = st.selectbox(
+        "📅 Select Date",
+        options=available_dates,
+        index=0,  # default to the latest date
+        help="Select a date to view product distribution and ratio analysis."
+    )
+
+    # --- Determine which date's data to load ---
+    if "selected_date" not in st.session_state:
+        # On first load → show latest data
+        st.session_state.selected_date = latest_date_str
+
+    # If user changes selection, update state
+    if selected_date != st.session_state.selected_date:
+        st.session_state.selected_date = selected_date
+
+    # --- Fetch data for the selected date ---
+    data_df = dashboard.get_table_data(date=st.session_state.selected_date)
+
     if data_df.empty:
-        st.warning(f"No data available for {latest_date_str}")
+        st.error(f"❌ No data found for **{st.session_state.selected_date}**. Please choose another date.")
         return
 
+    # --- Show date info ---
+    st.info(f"Showing data for **{st.session_state.selected_date}**")
     # Convert columns to integers
     for col in ['rings', 'pendants', 'earrings', 'bracelets']:
         data_df[col] = pd.to_numeric(data_df[col], errors='coerce').fillna(0).astype(int)
