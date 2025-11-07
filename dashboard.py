@@ -128,7 +128,15 @@ def main():
         return
 
     # Get all available dates sorted (latest first)
-    available_dates = sorted(all_data['date'].unique(), reverse=True)
+    all_data['date'] = pd.to_datetime(all_data['date'], format="%d-%m-%Y")
+
+    # Format dates for display (strings)
+    available_dates = sorted(
+        [d.strftime("%d-%m-%Y") for d in all_data['date'].unique()],
+        key=lambda x: datetime.strptime(x, "%d-%m-%Y"),
+        reverse=True
+    )
+
     latest_date_str = available_dates[0]
 
     # --- Add date selector ---
