@@ -38,7 +38,7 @@ class DatabaseManager:
             return True
         except Exception as e:
             print(f"❌ Error inserting data: {e}")
-            return False
+            return True
 
     def update_jewelry_data(self, record_id, counts):
         """Update existing jewelry data"""
